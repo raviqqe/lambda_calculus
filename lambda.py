@@ -97,26 +97,26 @@ class Parser:
     return self.term()
 
   def term(self):
-    def parser(pos):
+    def term_parser(pos):
       result, pos = choice(self.variable(),
                            self.lambda_abstraction(),
                            self.function_application())(pos)
       if isinstance(result, Error):
         return result.append_message("A term is expected."), pos
       return result, pos
-    return parser
+    return term_parser
 
   def variable(self):
-    def parser(pos):
+    def variable_parser(pos):
       result, pos = self.identifier()(pos)
       if isinstance(result, Error):
         return result.append_message("A variable is expected."), pos
       return Variable(result), pos
 
-    return parser
+    return variable_parser
 
   def lambda_abstraction(self):
-    def parser(pos):
+    def lambda_abstraction_parser(pos):
       results, pos = sequence(self.keyword("\\"),
                               self.identifier(),
                               self.keyword("."))(pos)
@@ -129,10 +129,10 @@ class Parser:
 
       return LambdaAbstraction(results[1], result), pos
 
-    return parser
+    return lambda_abstraction_parser
 
   def function_application(self):
-    def parser(pos):
+    def function_application_parser(pos):
       result_1, pos = self.expression()(pos)
       if isinstance(result_1, Error):
         return result_1.append_message("An expression is expected."), pos
@@ -143,10 +143,10 @@ class Parser:
 
       return FunctionApplication(result_1, result_2), pos
 
-    return parser
+    return function_application_parser
 
   def identifier(self):
-    def parser(pos):
+    def identifier_parser(pos):
       _, pos = self.blanks()(pos)
       if len(self.text[pos:]) > 0:
         identifier = self.text[pos:].split()[0]
@@ -155,26 +155,26 @@ class Parser:
           return identifier, pos + len(identifier)
       return Error("An identifier is expected."), pos
 
-    return parser
+    return identifier_parser
 
   def keyword(self, keyword):
     assert keyword in KEYWORDS
 
-    def parser(pos):
+    def keyword_parser(pos):
       _, pos = self.blanks()(pos)
       if self.text[:len(keyword)] == keyword:
         return keyword, pos + len(keyword)
       return Error("A keyword, \"{}\" is expected.".format(keyword)), pos
 
-    return parser
+    return keyword_parser
 
   def blanks(self):
-    def parser(pos):
+    def blanks_parser(pos):
       while pos < len(self.text) and self.text[pos] in {" ", "\t", "\n"}:
         pos += 1
       return None, pos
 
-    return parser
+    return blanks_parser
 
 
 
