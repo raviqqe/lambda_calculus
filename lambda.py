@@ -2,6 +2,7 @@
 
 import abc
 import sys
+import unicodedata
 
 
 
@@ -146,15 +147,12 @@ class Parser:
     return function_application_parser
 
   def identifier(self):
-    def identifier_parser(pos):
-      _, pos = self.blanks()(pos)
-      if len(self.text[pos:]) > 0:
-        identifier = self.text[pos:].split()[0]
-        if len(identifier) > 0 \
-           and all(punctuation not in identifier
-                   for punctuation in PUNCTUATIONS):
-          return identifier, pos + len(identifier)
-      return Error("An identifier is expected."), pos
+    def identifier_parser(old_pos):
+      _, pos = self.blanks()(old_pos)
+      results, pos = sequence(self.letter(), many(self.letter()))(pos)
+      if isinstance(results, Error):
+        return Error("An identifier is expected."), old_pos
+      return results[0] + "".join(results[1]), pos
 
     return identifier_parser
 
@@ -178,6 +176,15 @@ class Parser:
 
     return blanks_parser
 
+  def letter(self):
+    def letter_parser(pos):
+      if len(self.text[pos:]) > 0 \
+         and unicodedata.category(self.text[pos]).startswith("L"):
+        return self.text[pos], pos + 1
+      return Error("A letter is expected."), pos
+
+    return letter_parser
+
 
 
 # functions
@@ -193,15 +200,29 @@ def choice(*parsers):
 
 
 def sequence(*parsers):
-  def parser(pos):
+  def parser(old_pos):
+    pos = old_pos
     results = []
     for parser in parsers:
-      result, pos = parser(pos)
+      result, new_pos = parser(pos)
       if isinstance(result, Error):
         return result, pos
+      pos = new_pos
       results.append(result)
     return results, pos
   return parser
+
+
+def many(parser):
+  def many_parser(pos):
+    results = []
+    result, new_pos = parser(pos)
+    while not isinstance(result, Error):
+      results.append(result)
+      pos = new_pos
+      result, new_pos = parser(pos)
+    return results, pos
+  return many_parser
 
 
 def recursed(parser_generator, *arguments):
