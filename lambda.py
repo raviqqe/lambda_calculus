@@ -161,7 +161,7 @@ class Parser:
 
     def punctuation_parser(pos):
       _, pos = self.blanks()(pos)
-      if self.text[:len(punctuation)] == punctuation:
+      if self.text[pos:pos+len(punctuation)] == punctuation:
         return punctuation, pos + len(punctuation)
       return Error("A punctuation, \"{}\" is expected.".format(punctuation)), \
              pos
