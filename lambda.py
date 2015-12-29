@@ -46,9 +46,9 @@ class Variable(AstNode):
     return self.name
 
   def eval(self, env):
-    if name in env:
-      return env[name]
-    return Error("A variable, {} is not defined.".format(name))
+    if self.name in env:
+      return env[self.name]
+    return Error("A variable, \"{}\" is not defined.".format(self.name))
 
 
 class LambdaAbstraction(AstNode):
@@ -90,8 +90,6 @@ class FunctionApplication(AstNode):
 class Parser:
   def parse(self, text):
     self.text = text
-    expression = self.expression() # DEBUG
-    exit("OK") # DEBUG
     result, _ = self.expression()(0)
     return result
 
@@ -100,9 +98,9 @@ class Parser:
 
   def term(self):
     def parser(pos):
-      result, pos = choice(self.function_application(),
-                           self.variable(),
-                           self.lambda_abstraction())(pos)
+      result, pos = choice(self.variable(),
+                           self.lambda_abstraction(),
+                           self.function_application())(pos)
       if isinstance(result, Error):
         return result.append_message("A term is expected."), pos
       return result, pos
@@ -230,7 +228,8 @@ def main():
   elif len(args) == 1:
     with open(args[0]) as f:
       print(interpret(f.read()))
-  usage()
+  else:
+    usage()
 
 
 if __name__ == "__main__":
