@@ -117,7 +117,6 @@ class Parser:
 
   def lambda_abstraction(self):
     def parser(pos):
-      print("OKOKOK") # DEBUG
       results, pos = sequence(self.keyword("\\"),
                               self.identifier(),
                               self.keyword("."))(pos)
