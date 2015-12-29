@@ -7,7 +7,7 @@ import sys
 
 # constants
 
-KEYWORDS = {"\\", "."}
+PUNCTUATIONS = {"\\", "."}
 
 
 
@@ -117,9 +117,9 @@ class Parser:
 
   def lambda_abstraction(self):
     def lambda_abstraction_parser(pos):
-      results, pos = sequence(self.keyword("\\"),
+      results, pos = sequence(self.punctuation("\\"),
                               self.identifier(),
-                              self.keyword("."))(pos)
+                              self.punctuation("."))(pos)
       if isinstance(results, Error):
         return results.append_message("A lambda abstraction is expected."), pos
 
@@ -151,22 +151,24 @@ class Parser:
       if len(self.text[pos:]) > 0:
         identifier = self.text[pos:].split()[0]
         if len(identifier) > 0 \
-           and all(not identifier.startswith(keyword) for keyword in KEYWORDS):
+           and all(punctuation not in identifier
+                   for punctuation in PUNCTUATIONS):
           return identifier, pos + len(identifier)
       return Error("An identifier is expected."), pos
 
     return identifier_parser
 
-  def keyword(self, keyword):
-    assert keyword in KEYWORDS
+  def punctuation(self, punctuation):
+    assert punctuation in PUNCTUATIONS
 
-    def keyword_parser(pos):
+    def punctuation_parser(pos):
       _, pos = self.blanks()(pos)
-      if self.text[:len(keyword)] == keyword:
-        return keyword, pos + len(keyword)
-      return Error("A keyword, \"{}\" is expected.".format(keyword)), pos
+      if self.text[:len(punctuation)] == punctuation:
+        return punctuation, pos + len(punctuation)
+      return Error("A punctuation, \"{}\" is expected.".format(punctuation)), \
+             pos
 
-    return keyword_parser
+    return punctuation_parser
 
   def blanks(self):
     def blanks_parser(pos):
