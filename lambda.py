@@ -117,6 +117,7 @@ class Parser:
 
   def lambda_abstraction(self):
     def parser(pos):
+      print("OKOKOK") # DEBUG
       results, pos = sequence(self.keyword("\\"),
                               self.identifier(),
                               self.keyword("."))(pos)
@@ -148,10 +149,11 @@ class Parser:
   def identifier(self):
     def parser(pos):
       _, pos = self.blanks()(pos)
-      identifier = self.text[pos:].split()[0]
-      if len(identifier) > 0 \
-         and all(not identifier.startswith(keyword) for keyword in KEYWORDS):
-        return identifier, pos + len(identifier)
+      if len(self.text[pos:]) > 0:
+        identifier = self.text[pos:].split()[0]
+        if len(identifier) > 0 \
+           and all(not identifier.startswith(keyword) for keyword in KEYWORDS):
+          return identifier, pos + len(identifier)
       return Error("An identifier is expected."), pos
 
     return parser
@@ -169,7 +171,7 @@ class Parser:
 
   def blanks(self):
     def parser(pos):
-      while self.text[pos] in {" ", "\t", "\n"}:
+      while pos < len(self.text) and self.text[pos] in {" ", "\t", "\n"}:
         pos += 1
       return None, pos
 
