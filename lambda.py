@@ -190,17 +190,17 @@ class Parser:
 # functions
 
 def choice(*parsers):
-  def parser(pos):
+  def choice_parser(pos):
     for parser in parsers:
       result, pos = parser(pos)
       if not isinstance(result, Error):
         return result, pos
     return result, pos
-  return parser
+  return choice_parser
 
 
 def sequence(*parsers):
-  def parser(old_pos):
+  def sequence_parser(old_pos):
     pos = old_pos
     results = []
     for parser in parsers:
@@ -210,7 +210,7 @@ def sequence(*parsers):
       pos = new_pos
       results.append(result)
     return results, pos
-  return parser
+  return sequence_parser
 
 
 def many(parser):
@@ -226,9 +226,9 @@ def many(parser):
 
 
 def recursed(parser_generator, *arguments):
-  def parser(pos):
+  def recursed_parser(pos):
     return parser_generator(*arguments)(pos)
-  return parser
+  return recursed_parser
 
 
 def interpret(text):
