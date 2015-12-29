@@ -23,7 +23,7 @@ class Error:
     return self.message
 
   def append_message(self, message):
-    self.message = message + "\n" + self.message
+    return Error(message + "\n" + self.message)
 
 
 ## AST
