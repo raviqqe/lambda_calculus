@@ -52,14 +52,14 @@ class AstNode(metaclass=abc.ABCMeta):
 
 class Variable(AstNode):
   def __init__(self, name):
-    self.name = name
+    self.__name = name
 
   def __str__(self):
-    return self.name
+    return self.__name
 
   def eval(self, env):
-    if self.name in env:
-      return env[self.name]
+    if self.__name in env:
+      return env[self.__name]
     return self
 
 
@@ -80,7 +80,10 @@ class LambdaAbstraction(AstNode):
     return self.__body
 
   def eval(self, env):
-    return LambdaAbstraction(self.argument, self.body.eval(env))
+    new_env = env.copy()
+    if self.__argument in new_env:
+      del new_env[self.__argument]
+    return LambdaAbstraction(self.__argument, self.__body.eval(new_env))
 
 
 class FunctionApplication(AstNode):
@@ -92,15 +95,14 @@ class FunctionApplication(AstNode):
     return str(self.left_expression) + " " + str(self.right_expression)
 
   def eval(self, env):
-    right_expression = self.right_expression.eval(env)
-
     if isinstance(self.left_expression, LambdaAbstraction):
       new_env = env.copy()
       new_env[self.left_expression.argument] = self.right_expression
       return self.left_expression.body.eval(new_env)
 
+    # apply 2 rules at the same time for convenience
     return FunctionApplication(self.left_expression.eval(env),
-                               right_expression).eval(env)
+                               self.right_expression.eval(env))
 
 
 ## parser
@@ -312,7 +314,10 @@ def interpret(text):
   result = Parser().parse(text)
   if isinstance(result, Error):
     return result
-  return result.eval({})
+
+  while str(result) != str(result.eval({})):
+    result = result.eval({})
+  return result
 
 
 ## utils
