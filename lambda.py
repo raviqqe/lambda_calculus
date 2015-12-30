@@ -22,19 +22,20 @@ DEBUG = False
 class Error:
   def __init__(self, pos, message, raw_message=False):
     if not raw_message:
-      self.message = self.format_message(pos, message)
+      self.__message = self.__format_message(pos, message)
     else:
-      self.message = message
+      self.__message = message
 
   def __str__(self):
-    return self.message
+    return self.__message
 
   def append_message(self, pos, message):
-    return Error(pos, self.message + "\n" + self.format_message(pos, message),
+    return Error(pos,
+                 self.__message + "\n" + self.__format_message(pos, message),
                  raw_message=True)
 
   @staticmethod
-  def format_message(pos, message):
+  def __format_message(pos, message):
     return "lambda:" + str(pos) + ": " + message
 
 
@@ -69,7 +70,7 @@ class LambdaAbstraction(AstNode):
     self.__body = body
 
   def __str__(self):
-    return "\\" + self.argument + "." + str(self.__body)
+    return "\\" + self.__argument + "." + str(self.__body)
 
   @property
   def argument(self):
@@ -88,28 +89,28 @@ class LambdaAbstraction(AstNode):
 
 class FunctionApplication(AstNode):
   def __init__(self, left_expression, right_expression):
-    self.left_expression = left_expression
-    self.right_expression = right_expression
+    self.__left_expression = left_expression
+    self.__right_expression = right_expression
 
   def __str__(self):
-    return str(self.left_expression) + " " + str(self.right_expression)
+    return str(self.__left_expression) + " " + str(self.__right_expression)
 
   def eval(self, env):
-    if isinstance(self.left_expression, LambdaAbstraction):
+    if isinstance(self.__left_expression, LambdaAbstraction):
       new_env = env.copy()
-      new_env[self.left_expression.argument] = self.right_expression
-      return self.left_expression.body.eval(new_env)
+      new_env[self.__left_expression.argument] = self.__right_expression
+      return self.__left_expression.body.eval(new_env)
 
     # apply 2 rules at the same time for convenience
-    return FunctionApplication(self.left_expression.eval(env),
-                               self.right_expression.eval(env))
+    return FunctionApplication(self.__left_expression.eval(env),
+                               self.__right_expression.eval(env))
 
 
 ## parser
 
 class Parser:
   def parse(self, text):
-    self.text = text
+    self.__text = text
     result, _ = self.top_expression()(0)
     return result
 
@@ -119,7 +120,7 @@ class Parser:
       if isinstance(results, Error):
         debug_parser(old_pos, "top expression failed.")
         return results, old_pos
-      elif pos != len(self.text):
+      elif pos != len(self.__text):
         debug_parser(old_pos, "top expression failed.")
         return Error(old_pos,
                      "Extra characters are detected at position, {}."
@@ -235,7 +236,7 @@ class Parser:
 
     def punctuation_parser(old_pos):
       _, pos = self.blanks()(old_pos)
-      if self.text[pos:pos+len(punctuation)] == punctuation:
+      if self.__text[pos:pos+len(punctuation)] == punctuation:
         debug_parser(pos, "punctuation, {} parsed.".format(punctuation))
         return punctuation, pos + len(punctuation)
       debug_parser(old_pos, "punctuation, {} failed.".format(punctuation))
@@ -248,7 +249,7 @@ class Parser:
   def blanks(self):
     def blanks_parser(old_pos):
       pos = old_pos
-      while pos < len(self.text) and self.text[pos] in {" ", "\t", "\n"}:
+      while pos < len(self.__text) and self.__text[pos] in {" ", "\t", "\n"}:
         pos += 1
       return None, pos
 
@@ -257,9 +258,9 @@ class Parser:
   def letter(self):
     def letter_parser(old_pos):
       pos = old_pos
-      if len(self.text[pos:]) > 0 \
-         and unicodedata.category(self.text[pos]).startswith("L"):
-        return self.text[pos], pos + 1
+      if len(self.__text[pos:]) > 0 \
+         and unicodedata.category(self.__text[pos]).startswith("L"):
+        return self.__text[pos], pos + 1
       return Error(old_pos, "A letter is expected."), old_pos
 
     return letter_parser
