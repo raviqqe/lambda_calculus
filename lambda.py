@@ -50,6 +50,10 @@ class AstNode(metaclass=abc.ABCMeta):
   def __str__(self):
     return NotImplemented
 
+  @staticmethod
+  def _bracketed(string):
+    return "(" + string + ")"
+
 
 class Variable(AstNode):
   def __init__(self, name):
@@ -70,7 +74,7 @@ class LambdaAbstraction(AstNode):
     self.__body = body
 
   def __str__(self):
-    return "\\" + self.__argument + "." + str(self.__body)
+    return self._bracketed("\\" + self.__argument + "." + str(self.__body))
 
   @property
   def argument(self):
@@ -93,7 +97,8 @@ class FunctionApplication(AstNode):
     self.__right_expression = right_expression
 
   def __str__(self):
-    return str(self.__left_expression) + " " + str(self.__right_expression)
+    return self._bracketed(str(self.__left_expression) + " "
+                           + str(self.__right_expression))
 
   def eval(self, env):
     if isinstance(self.__left_expression, LambdaAbstraction):
