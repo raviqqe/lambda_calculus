@@ -79,7 +79,7 @@ class LambdaAbstraction(AstNode):
     return self.__body
 
   def eval(self, env):
-    return self
+    return LambdaAbstraction(self.argument, self.body.eval(env))
 
 
 class FunctionApplication(AstNode):
@@ -91,12 +91,15 @@ class FunctionApplication(AstNode):
     return str(self.left_expression) + " " + str(self.right_expression)
 
   def eval(self, env):
-    left_expression = self.left_expression.eval(env)
     right_expression = self.right_expression.eval(env)
+
     if isinstance(self.left_expression, LambdaAbstraction):
-      env[self.left_expression.argument] = self.right_expression
-      return self.left_expression.body.eval(env)
-    return FunctionApplication(left_expression, right_expression)
+      new_env = env.copy()
+      new_env[self.left_expression.argument] = self.right_expression
+      return self.left_expression.body.eval(new_env)
+
+    return FunctionApplication(self.left_expression.eval(env),
+                               right_expression)
 
 
 ## parser
