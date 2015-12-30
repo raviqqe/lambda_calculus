@@ -132,9 +132,9 @@ class Parser:
                               parser,
                               self.punctuation(")"))(old_pos)
       if isinstance(results, Error):
-        debug("bracketed failed.")
+        debug_parser(old_pos, "bracketed failed.")
         return results, old_pos
-      debug("bracketed parsed.")
+      debug_parser(pos, "bracketed parsed.")
       return results[1], pos
     return bracketed_parser
 
@@ -156,18 +156,18 @@ class Parser:
                               self.identifier(),
                               self.punctuation("."))(old_pos)
       if isinstance(results, Error):
-        debug("lambda abstraction failed.")
+        debug_parser(old_pos, "lambda abstraction failed.")
         return results.append_message(old_pos,
                                       "A lambda abstraction is expected."), \
                old_pos
 
       result, pos = self.expression()(pos)
       if isinstance(result, Error):
-        debug("lambda abstraction failed.")
+        debug_parser(old_pos, "lambda abstraction failed.")
         return result.append_message(old_pos, "An expression is expected."), \
                old_pos
 
-      debug("lambda abstraction parsed.")
+      debug_parser(pos, "lambda abstraction parsed.")
       return LambdaAbstraction(results[1], result), pos
 
     return lambda_abstraction_parser
@@ -178,17 +178,17 @@ class Parser:
                              self.lambda_abstraction(),
                              self.bracketed(self.expression()))(old_pos)
       if isinstance(result_1, Error):
-        debug("function application failed.")
+        debug_parser(old_pos, "function application failed.")
         return result_1.append_message(old_pos, "An expression is expected."),\
                old_pos
 
       result_2, pos = self.expression()(pos)
       if isinstance(result_2, Error):
-        debug("function application failed.")
+        debug_parser(old_pos, "function application failed.")
         return result_2.append_message(old_pos, "An expression is expected."),\
                old_pos
 
-      debug("function application parsed.")
+      debug_parser(pos, "function application parsed.")
       return FunctionApplication(result_1, result_2), pos
 
     return function_application_parser
@@ -212,9 +212,9 @@ class Parser:
     def punctuation_parser(old_pos):
       _, pos = self.blanks()(old_pos)
       if self.text[pos:pos+len(punctuation)] == punctuation:
-        debug("punctuation, {} parsed.".format(punctuation))
+        debug_parser(pos, "punctuation, {} parsed.".format(punctuation))
         return punctuation, pos + len(punctuation)
-      debug("punctuation, {} failed.".format(punctuation))
+      debug_parser(old_pos, "punctuation, {} failed.".format(punctuation))
       return Error(old_pos,
                    "A punctuation, \"{}\" is expected.".format(punctuation)), \
              old_pos
