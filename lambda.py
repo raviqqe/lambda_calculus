@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 
 import abc
+import functools
 import sys
 import unicodedata
+import argparse
 
 
 
 # constants
 
 PUNCTUATIONS = {"\\", ".", "(", ")"}
-DEBUG = True
+DEBUG = False
 
 
 
@@ -20,19 +22,20 @@ DEBUG = True
 class Error:
   def __init__(self, pos, message, raw_message=False):
     if not raw_message:
-      self.message = self.format_message(pos, message)
+      self.__message = self.__format_message(pos, message)
     else:
-      self.message = message
+      self.__message = message
 
   def __str__(self):
-    return self.message
+    return self.__message
 
   def append_message(self, pos, message):
-    return Error(pos, self.message + "\n" + self.format_message(pos, message),
+    return Error(pos,
+                 self.__message + "\n" + self.__format_message(pos, message),
                  raw_message=True)
 
   @staticmethod
-  def format_message(pos, message):
+  def __format_message(pos, message):
     return "lambda:" + str(pos) + ": " + message
 
 
@@ -47,17 +50,21 @@ class AstNode(metaclass=abc.ABCMeta):
   def __str__(self):
     return NotImplemented
 
+  @staticmethod
+  def _bracketed(string):
+    return "(" + string + ")"
+
 
 class Variable(AstNode):
   def __init__(self, name):
-    self.name = name
+    self.__name = name
 
   def __str__(self):
-    return self.name
+    return self.__name
 
   def eval(self, env):
-    if self.name in env:
-      return env[self.name]
+    if self.__name in env:
+      return env[self.__name]
     return self
 
 
@@ -67,7 +74,7 @@ class LambdaAbstraction(AstNode):
     self.__body = body
 
   def __str__(self):
-    return "\\" + self.argument + "." + str(self.__body)
+    return self._bracketed("\\" + self.__argument + "." + str(self.__body))
 
   @property
   def argument(self):
@@ -78,28 +85,37 @@ class LambdaAbstraction(AstNode):
     return self.__body
 
   def eval(self, env):
-    return self
+    new_env = env.copy()
+    if self.__argument in new_env:
+      del new_env[self.__argument]
+    return LambdaAbstraction(self.__argument, self.__body.eval(new_env))
 
 
 class FunctionApplication(AstNode):
-  def __init__(self, right_expression, left_expression):
-    assert isinstance(right_expression, LambdaAbstraction)
-    self.right_expression = right_expression
-    self.left_expression = left_expression
+  def __init__(self, left_expression, right_expression):
+    self.__left_expression = left_expression
+    self.__right_expression = right_expression
 
   def __str__(self):
-    return str(self.right_expression) + " " + str(self.left_expression)
+    return self._bracketed(str(self.__left_expression) + " "
+                           + str(self.__right_expression))
 
   def eval(self, env):
-    env[self.right_expression.argument] = left_expression.eval(env)
-    return self.right_expression.body.eval(env)
+    if isinstance(self.__left_expression, LambdaAbstraction):
+      new_env = env.copy()
+      new_env[self.__left_expression.argument] = self.__right_expression
+      return self.__left_expression.body.eval(new_env)
+
+    # apply 2 rules at the same time for convenience
+    return FunctionApplication(self.__left_expression.eval(env),
+                               self.__right_expression.eval(env))
 
 
 ## parser
 
 class Parser:
   def parse(self, text):
-    self.text = text
+    self.__text = text
     result, _ = self.top_expression()(0)
     return result
 
@@ -109,7 +125,7 @@ class Parser:
       if isinstance(results, Error):
         debug_parser(old_pos, "top expression failed.")
         return results, old_pos
-      elif pos != len(self.text):
+      elif pos != len(self.__text):
         debug_parser(old_pos, "top expression failed.")
         return Error(old_pos,
                      "Extra characters are detected at position, {}."
@@ -132,9 +148,9 @@ class Parser:
 
   def term(self):
     def term_parser(old_pos):
-      result, pos = choice(self.variable(),
+      result, pos = choice(self.function_applications(), self.variable(),
                            self.lambda_abstraction(),
-                           self.function_application())(old_pos)
+                           )(old_pos)
       if isinstance(result, Error):
         debug_parser(old_pos, "term failed.")
         return result.append_message(old_pos, "A term is expected."), old_pos
@@ -188,26 +204,24 @@ class Parser:
 
     return lambda_abstraction_parser
 
-  def function_application(self):
-    def function_application_parser(old_pos):
-      result_1, pos = choice(self.variable(),
-                             self.lambda_abstraction(),
-                             self.bracketed(self.expression()))(old_pos)
-      if isinstance(result_1, Error):
-        debug_parser(old_pos, "function application failed.")
-        return result_1.append_message(old_pos, "An expression is expected."),\
-               old_pos
-
-      result_2, pos = self.expression()(pos)
-      if isinstance(result_2, Error):
-        debug_parser(old_pos, "function application failed.")
-        return result_2.append_message(old_pos, "An expression is expected."),\
+  def function_applications(self):
+    def function_applications_parser(old_pos):
+      elem = choice(self.variable(),
+                    self.lambda_abstraction(),
+                    self.bracketed(self.expression()))
+      results, pos = sequence(elem, elem, many(elem))(old_pos)
+      if isinstance(results, Error):
+        debug_parser(old_pos, "function applications failed.")
+        return results.append_message(old_pos,
+                                      "Function applications are expected."), \
                old_pos
 
       debug_parser(pos, "function application parsed.")
-      return FunctionApplication(result_1, result_2), pos
+      return functools.reduce(lambda x, y: FunctionApplication(x, y),
+                                [results[0], results[1], *results[2]]), \
+             pos
 
-    return function_application_parser
+    return function_applications_parser
 
   def identifier(self):
     def identifier_parser(old_pos):
@@ -227,7 +241,7 @@ class Parser:
 
     def punctuation_parser(old_pos):
       _, pos = self.blanks()(old_pos)
-      if self.text[pos:pos+len(punctuation)] == punctuation:
+      if self.__text[pos:pos+len(punctuation)] == punctuation:
         debug_parser(pos, "punctuation, {} parsed.".format(punctuation))
         return punctuation, pos + len(punctuation)
       debug_parser(old_pos, "punctuation, {} failed.".format(punctuation))
@@ -240,7 +254,7 @@ class Parser:
   def blanks(self):
     def blanks_parser(old_pos):
       pos = old_pos
-      while pos < len(self.text) and self.text[pos] in {" ", "\t", "\n"}:
+      while pos < len(self.__text) and self.__text[pos] in {" ", "\t", "\n"}:
         pos += 1
       return None, pos
 
@@ -249,9 +263,9 @@ class Parser:
   def letter(self):
     def letter_parser(old_pos):
       pos = old_pos
-      if len(self.text[pos:]) > 0 \
-         and unicodedata.category(self.text[pos]).startswith("L"):
-        return self.text[pos], pos + 1
+      if len(self.__text[pos:]) > 0 \
+         and unicodedata.category(self.__text[pos]).startswith("L"):
+        return self.__text[pos], pos + 1
       return Error(old_pos, "A letter is expected."), old_pos
 
     return letter_parser
@@ -306,14 +320,13 @@ def interpret(text):
   result = Parser().parse(text)
   if isinstance(result, Error):
     return result
-  return result.eval({})
+
+  while str(result) != str(result.eval({})):
+    result = result.eval({})
+  return result
 
 
 ## utils
-
-def usage():
-  exit("usage: {} [<file>]".format(sys.argv[0]))
-
 
 def debug(*messages):
   if DEBUG:
@@ -325,19 +338,28 @@ def debug_parser(pos, *messages):
     print(str(pos) + ":", *messages, file=sys.stderr)
 
 
+def parse_args():
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-d", "--debug", action="store_true")
+  parser.add_argument("source_file", nargs="?", default=None)
+  args = parser.parse_args()
+
+  global DEBUG
+  DEBUG = args.debug
+
+  return args
+
 
 # main routine
 
 def main():
-  args = sys.argv[1:]
+  args = parse_args()
 
-  if len(args) == 0:
+  if args.source_file == None:
     print(interpret(input()))
-  elif len(args) == 1:
-    with open(args[0]) as f:
-      print(interpret(f.read()))
   else:
-    usage()
+    with open(args.source_file) as f:
+      print(interpret(f.read()))
 
 
 if __name__ == "__main__":
