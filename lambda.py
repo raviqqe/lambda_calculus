@@ -4,13 +4,14 @@ import abc
 import functools
 import sys
 import unicodedata
+import argparse
 
 
 
 # constants
 
 PUNCTUATIONS = {"\\", ".", "(", ")"}
-DEBUG = True
+DEBUG = False
 
 
 
@@ -99,7 +100,7 @@ class FunctionApplication(AstNode):
       return self.left_expression.body.eval(new_env)
 
     return FunctionApplication(self.left_expression.eval(env),
-                               right_expression)
+                               right_expression).eval(env)
 
 
 ## parser
@@ -316,10 +317,6 @@ def interpret(text):
 
 ## utils
 
-def usage():
-  exit("usage: {} [<file>]".format(sys.argv[0]))
-
-
 def debug(*messages):
   if DEBUG:
     print(*messages, file=sys.stderr)
@@ -330,19 +327,28 @@ def debug_parser(pos, *messages):
     print(str(pos) + ":", *messages, file=sys.stderr)
 
 
+def parse_args():
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-d", "--debug", action="store_true")
+  parser.add_argument("source_file", nargs="?", default=None)
+  args = parser.parse_args()
+
+  global DEBUG
+  DEBUG = args.debug
+
+  return args
+
 
 # main routine
 
 def main():
-  args = sys.argv[1:]
+  args = parse_args()
 
-  if len(args) == 0:
+  if args.source_file == None:
     print(interpret(input()))
-  elif len(args) == 1:
-    with open(args[0]) as f:
-      print(interpret(f.read()))
   else:
-    usage()
+    with open(args.source_file) as f:
+      print(interpret(f.read()))
 
 
 if __name__ == "__main__":
