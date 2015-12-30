@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import abc
+import functools
 import sys
 import unicodedata
 
@@ -82,17 +83,20 @@ class LambdaAbstraction(AstNode):
 
 
 class FunctionApplication(AstNode):
-  def __init__(self, right_expression, left_expression):
-    assert isinstance(right_expression, LambdaAbstraction)
-    self.right_expression = right_expression
+  def __init__(self, left_expression, right_expression):
     self.left_expression = left_expression
+    self.right_expression = right_expression
 
   def __str__(self):
-    return str(self.right_expression) + " " + str(self.left_expression)
+    return str(self.left_expression) + " " + str(self.right_expression)
 
   def eval(self, env):
-    env[self.right_expression.argument] = left_expression.eval(env)
-    return self.right_expression.body.eval(env)
+    left_expression = self.left_expression.eval(env)
+    right_expression = self.right_expression.eval(env)
+    if isinstance(self.left_expression, LambdaAbstraction):
+      env[self.left_expression.argument] = self.right_expression
+      return self.left_expression.body.eval(env)
+    return FunctionApplication(left_expression, right_expression)
 
 
 ## parser
@@ -132,9 +136,9 @@ class Parser:
 
   def term(self):
     def term_parser(old_pos):
-      result, pos = choice(self.variable(),
+      result, pos = choice(self.function_applications(), self.variable(),
                            self.lambda_abstraction(),
-                           self.function_application())(old_pos)
+                           )(old_pos)
       if isinstance(result, Error):
         debug_parser(old_pos, "term failed.")
         return result.append_message(old_pos, "A term is expected."), old_pos
@@ -188,26 +192,24 @@ class Parser:
 
     return lambda_abstraction_parser
 
-  def function_application(self):
-    def function_application_parser(old_pos):
-      result_1, pos = choice(self.variable(),
-                             self.lambda_abstraction(),
-                             self.bracketed(self.expression()))(old_pos)
-      if isinstance(result_1, Error):
-        debug_parser(old_pos, "function application failed.")
-        return result_1.append_message(old_pos, "An expression is expected."),\
-               old_pos
-
-      result_2, pos = self.expression()(pos)
-      if isinstance(result_2, Error):
-        debug_parser(old_pos, "function application failed.")
-        return result_2.append_message(old_pos, "An expression is expected."),\
+  def function_applications(self):
+    def function_applications_parser(old_pos):
+      elem = choice(self.variable(),
+                    self.lambda_abstraction(),
+                    self.bracketed(self.expression()))
+      results, pos = sequence(elem, elem, many(elem))(old_pos)
+      if isinstance(results, Error):
+        debug_parser(old_pos, "function applications failed.")
+        return results.append_message(old_pos,
+                                      "Function applications are expected."), \
                old_pos
 
       debug_parser(pos, "function application parsed.")
-      return FunctionApplication(result_1, result_2), pos
+      return functools.reduce(lambda x, y: FunctionApplication(x, y),
+                                [results[0], results[1], *results[2]]), \
+             pos
 
-    return function_application_parser
+    return function_applications_parser
 
   def identifier(self):
     def identifier_parser(old_pos):
