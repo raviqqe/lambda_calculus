@@ -100,8 +100,24 @@ class FunctionApplication(AstNode):
 class Parser:
   def parse(self, text):
     self.text = text
-    result, _ = self.expression()(0)
+    result, _ = self.top_expression()(0)
     return result
+
+  def top_expression(self):
+    def top_expression_parser(old_pos):
+      results, pos = sequence(self.expression(), self.blanks())(old_pos)
+      if isinstance(results, Error):
+        debug_parser(old_pos, "top expression failed.")
+        return results, old_pos
+      elif pos != len(self.text):
+        debug_parser(old_pos, "top expression failed.")
+        return Error(old_pos,
+                     "Extra characters are detected at position, {}."
+                     .format(pos)), \
+               old_pos
+      debug_parser(pos, "top expression parsed.")
+      return results[0], pos
+    return top_expression_parser
 
   def expression(self):
     def expression_parser(old_pos):
